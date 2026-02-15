@@ -1,0 +1,122 @@
+[
+    {
+      "item_code": "0203002",
+      "description": "VESTA EMULSION WHITE 4 LTRS",
+      "quantity": 9,
+      "buying_price": 460.00,
+      "selling_price": 650.00,
+      "profit_per_item": 190.00
+    },
+    {
+      "item_code": "0203019",
+      "description": "VESTA EMULSION CREAM 4 LTS",
+      "quantity": 6,
+      "buying_price": 460.00,
+      "selling_price": 650.00,
+      "profit_per_item": 190.00
+    },
+    {
+      "item_code": "0203003",
+      "description": "VESTA EMULSION SOFT WHITE 4L",
+      "quantity": 4,
+      "buying_price": 460.00,
+      "selling_price": 650.00,
+      "profit_per_item": 190.00
+    },
+    {
+      "item_code": "0203013",
+      "description": "VESTA EMULSION MAGNOLIA 4L",
+      "quantity": 3,
+      "buying_price": 460.00,
+      "selling_price": 650.00,
+      "profit_per_item": 190.00
+    },
+    {
+      "item_code": "0203022",
+      "description": "VESTA EMULSION BUTTERCUP 4L",
+      "quantity": 11,
+      "buying_price": 460.00,
+      "selling_price": 650.00,
+      "profit_per_item": 190.00
+    },
+    {
+      "item_code": "0201002",
+      "description": "VESTA GLOSS WHITE 4 LTS",
+      "quantity": 7,
+      "buying_price": 1850.00,
+      "selling_price": 2400.00,
+      "profit_per_item": 550.00
+    },
+    {
+      "item_code": "0201026",
+      "description": "VESTA GLOSS CRISTAL GREY 4L",
+      "quantity": 2,
+      "buying_price": 1850.00,
+      "selling_price": 2400.00,
+      "profit_per_item": 550.00
+    },
+    {
+      "item_code": "0101032",
+      "description": "VESTA GLOSS SIGNAL RED 4L",
+      "quantity": 3,
+      "buying_price": 2350.00,
+      "selling_price": 2800.00,
+      "profit_per_item": 450.00
+    },
+    {
+      "item_code": "0101028",
+      "description": "VESTA GLOSS P.BLUE 4L",
+      "quantity": 4,
+      "buying_price": 1850.00,
+      "selling_price": 2400.00,
+      "profit_per_item": 550.00
+    },
+    {
+      "item_code": "0203033",
+      "description": "VESTA EMULSION SUNFLOWER 4L",
+      "quantity": 10,
+      "buying_price": 460.00,
+      "selling_price": 650.00,
+      "profit_per_item": 190.00
+    },
+    {
+      "item_code": "0203044",
+      "description": "VESTA EMULSION BRIGHT RED 4L",
+      "quantity": 2,
+      "buying_price": 950.00,
+      "selling_price": 1300.00,
+      "profit_per_item": 350.00
+    },
+    {
+      "item_code": "1002001",
+      "description": "PU-ROOF COATING LIGHT GREEN 4L",
+      "quantity": 5,
+      "buying_price": 1200.00,
+      "selling_price": 1600.00,
+      "profit_per_item": 400.00
+    },
+    {
+        "item_code": "1002002",
+        "description": "PU-ROOF COATING RED 4L",
+        "quantity": 8,
+        "buying_price": 1200.00,
+        "selling_price": 1600.00,
+        "profit_per_item": 400.00
+    },
+    {
+        "item_code": "0203055",
+        "description": "VESTA EMULSION SKY BLUE 4L",
+        "quantity": 12,
+        "buying_price": 460.00,
+        "selling_price": 650.00,
+        "profit_per_item": 190.00
+    },
+    {
+        "item_code": "0201014",
+        "description": "VESTA GLOSS IVORY 4L",
+        "quantity": 5,
+        "buying_price": 1850.00,
+        "selling_price": 2400.00,
+        "profit_per_item": 550.00
+    }
+]
