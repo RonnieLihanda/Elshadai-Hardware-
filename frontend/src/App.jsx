@@ -160,11 +160,16 @@ function POS() {
     });
   };
 
+  const removeFromCart = (id) => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
+
   const updateCartQty = (id, delta, max) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
-        if (newQty > 0 && newQty <= max) return { ...item, quantity: newQty };
+        // Allow up to max stock, and at least 0
+        if (newQty >= 0 && newQty <= max) return { ...item, quantity: newQty };
       }
       return item;
     }).filter(i => i.quantity > 0));
@@ -174,57 +179,76 @@ function POS() {
     const newQty = parseInt(val) || 0;
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        if (newQty > max) return { ...item, quantity: max };
-        return { ...item, quantity: newQty };
+        let qty = newQty;
+        if (qty > max) qty = max;
+        if (qty < 0) qty = 0;
+        return { ...item, quantity: qty };
       }
       return item;
     }).filter(i => i.quantity > 0));
   };
 
+  const calculateItemPrice = (item) => {
+    return item.quantity >= (item.discount_threshold || 7)
+      ? item.discount_price
+      : item.regular_price;
+  };
+
   const total = cart.reduce((sum, item) => {
-    const price = item.quantity >= item.discount_threshold ? item.discount_price : item.regular_price;
+    const price = calculateItemPrice(item);
     return sum + (price * item.quantity);
   }, 0);
 
   const totalSavings = cart.reduce((sum, item) => {
-    if (item.quantity >= item.discount_threshold) {
+    if (item.quantity >= (item.discount_threshold || 7)) {
       return sum + ((item.regular_price - item.discount_price) * item.quantity);
     }
     return sum;
   }, 0);
 
   const totalProfit = cart.reduce((sum, item) => {
-    const price = item.quantity >= item.discount_threshold ? item.discount_price : item.regular_price;
-    const profitPerItem = price - item.buying_price;
-    return sum + (profitPerItem * item.quantity);
+    const price = calculateItemPrice(item);
+    return sum + ((price - item.buying_price) * item.quantity);
   }, 0);
 
   const completeSale = async () => {
     if (cart.length === 0) return;
     setCompleting(true);
     try {
+      const saleItems = cart.map(item => {
+        const effectivePrice = calculateItemPrice(item);
+        return {
+          product_id: item.id,
+          item_code: item.item_code,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: effectivePrice,
+          total_price: effectivePrice * item.quantity,
+          profit: (effectivePrice - item.buying_price) * item.quantity,
+          discount_applied: item.quantity >= (item.discount_threshold || 7),
+          regular_price: item.regular_price,
+          discount_price: item.discount_price
+        };
+      });
+
       const saleData = {
-        items: cart.map(item => {
-          const effectivePrice = item.quantity >= item.discount_threshold ? item.discount_price : item.regular_price;
-          return {
-            product_id: item.id,
-            item_code: item.item_code,
-            description: item.description,
-            quantity: item.quantity,
-            unit_price: effectivePrice,
-            total_price: effectivePrice * item.quantity,
-            profit: (effectivePrice - item.buying_price) * item.quantity,
-            discount_threshold: item.discount_threshold
-          };
-        }),
+        items: saleItems,
         total_amount: total,
         total_profit: totalProfit
       };
+
       const result = await api.createSale(saleData, token);
-      setReceipt({ ...result, items: saleData.items, total_amount: total, total_savings: totalSavings, seller: user.fullName });
+      setReceipt({
+        ...result,
+        items: saleItems,
+        total_amount: total,
+        total_savings: totalSavings,
+        seller: user.fullName
+      });
       setCart([]);
     } catch (err) {
-      alert(err.message);
+      console.error('Sale failed:', err);
+      alert(`Sale failed: ${err.message}. Please check if the backend is running and you have stock.`);
     } finally {
       setCompleting(false);
     }
@@ -316,7 +340,7 @@ function POS() {
                     {isBulk && (
                       <div className="savings">Saved: KES {((item.regular_price - item.discount_price) * item.quantity).toLocaleString()}</div>
                     )}
-                    <button onClick={() => updateCartQty(item.id, -item.quantity, 0)} style={{ color: 'var(--danger)', background: 'transparent', fontSize: '0.75rem', marginTop: '0.25rem' }}>Remove</button>
+                    <button onClick={() => removeFromCart(item.id)} style={{ color: 'var(--danger)', background: 'transparent', fontSize: '0.75rem', marginTop: '0.25rem' }}>Remove</button>
                   </div>
                 </div>
               </div>
@@ -381,6 +405,7 @@ function Receipt({ receipt, onClose }) {
             <tbody>
               {receipt.items.map((item, idx) => {
                 const isDiscounted = item.quantity >= (item.discount_threshold || 7);
+                const savings = isDiscounted ? (item.regular_price - item.discount_price) * item.quantity : 0;
                 return (
                   <React.Fragment key={idx}>
                     <tr>
@@ -391,8 +416,7 @@ function Receipt({ receipt, onClose }) {
                     {isDiscounted && (
                       <tr>
                         <td colSpan="3" style={{ textAlign: 'left', fontSize: '0.7rem', paddingLeft: '0.5rem' }}>
-                          (Bulk discount applied - Saved KES {((item.total_price / item.quantity * (item.regular_price / item.discount_price)) - item.total_price).toFixed(0)})
-                          {/* Calculated savings for receipt display if original price is needed, simplifying for now */}
+                          (Bulk discount applied - Saved KES {savings.toLocaleString()})
                         </td>
                       </tr>
                     )}

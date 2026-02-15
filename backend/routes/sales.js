@@ -32,11 +32,58 @@ router.post('/', authenticateToken, (req, res) => {
             const itemStmt = db.prepare(`INSERT INTO sale_items (sale_id, product_id, item_code, description, quantity, unit_price, total_price, profit, discount_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
             const updateProductStmt = db.prepare(`UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
 
-            let transactionError = null;
+            let completed = 0;
+            const totalItems = items.length;
 
-            // In a real app we would verify prices against DB here. 
-            // For now we trust the frontend's calculation but we'll include the discount_applied flag
-            items.forEach(item => {
+            if (totalItems === 0) {
+                db.run('ROLLBACK');
+                return res.status(400).json({ message: 'No items in cart' });
+            }
+
+            const processNextItem = (index) => {
+                if (index === totalItems) {
+                    // All items processed, finalize and commit
+                    itemStmt.finalize();
+                    updateProductStmt.finalize();
+
+                    db.run('COMMIT', (err) => {
+                        if (err) {
+                            return res.status(500).json({ error: err.message });
+                        }
+
+                        // Prepare receipt data
+                        const receiptData = {
+                            receipt_number,
+                            seller: req.user.fullName,
+                            items: items.map(item => ({
+                                ...item,
+                                discount_applied: item.quantity >= (item.discount_threshold || 7)
+                            })),
+                            total_amount,
+                            created_at: new Date().toISOString()
+                        };
+
+                        // Persist receipt data
+                        db.run(`INSERT INTO receipts (receipt_number, sale_id, receipt_data) VALUES (?, ?, ?)`,
+                            [receipt_number, sale_id, JSON.stringify(receiptData)],
+                            (err) => {
+                                if (err) console.error('Error persisting receipt:', err.message);
+                            }
+                        );
+
+                        // Trigger background Excel sync
+                        excelSync.syncSale(receipt_number, req.user.fullName, items, total_amount);
+
+                        res.status(201).json({
+                            id: sale_id,
+                            receipt_number,
+                            message: 'Sale completed successfully'
+                        });
+                    });
+                    return;
+                }
+
+                const item = items[index];
                 const discount_applied = item.quantity >= (item.discount_threshold || 7) ? 1 : 0;
 
                 itemStmt.run([
@@ -50,56 +97,26 @@ router.post('/', authenticateToken, (req, res) => {
                     item.profit,
                     discount_applied
                 ], (err) => {
-                    if (err) transactionError = err;
-                });
-
-                updateProductStmt.run([item.quantity, item.product_id], (err) => {
-                    if (err) transactionError = err;
-                });
-            });
-
-            itemStmt.finalize();
-            updateProductStmt.finalize();
-
-            if (transactionError) {
-                db.run('ROLLBACK');
-                return res.status(500).json({ error: transactionError.message });
-            }
-
-            db.run('COMMIT', (err) => {
-                if (err) {
-                    return res.status(500).json({ error: err.message });
-                }
-
-                // Prepare receipt data
-                const receiptData = {
-                    receipt_number,
-                    seller: req.user.fullName,
-                    items: items.map(item => ({
-                        ...item,
-                        discount_applied: item.quantity >= (item.discount_threshold || 7)
-                    })),
-                    total_amount,
-                    created_at: new Date().toISOString()
-                };
-
-                // Persist receipt data
-                db.run(`INSERT INTO receipts (receipt_number, sale_id, receipt_data) VALUES (?, ?, ?)`,
-                    [receipt_number, sale_id, JSON.stringify(receiptData)],
-                    (err) => {
-                        if (err) console.error('Error persisting receipt:', err.message);
+                    if (err) {
+                        db.run('ROLLBACK');
+                        itemStmt.finalize();
+                        updateProductStmt.finalize();
+                        return res.status(500).json({ error: `Failed to save item ${item.item_code}: ${err.message}` });
                     }
-                );
 
-                // Trigger background Excel sync
-                excelSync.syncSale(receipt_number, req.user.fullName, items, total_amount);
-
-                res.status(201).json({
-                    id: sale_id,
-                    receipt_number,
-                    message: 'Sale completed successfully'
+                    updateProductStmt.run([item.quantity, item.product_id], (err) => {
+                        if (err) {
+                            db.run('ROLLBACK');
+                            itemStmt.finalize();
+                            updateProductStmt.finalize();
+                            return res.status(500).json({ error: `Failed to update stock for ${item.item_code}: ${err.message}` });
+                        }
+                        processNextItem(index + 1);
+                    });
                 });
-            });
+            };
+
+            processNextItem(0);
         });
     });
 });

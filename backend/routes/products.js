@@ -5,10 +5,22 @@ const path = require('path');
 const authenticateToken = require('../middleware/auth');
 const adminOnly = require('../middleware/admin');
 
+const excelSync = require('../utils/excelSync');
+
 const dbPath = path.join(__dirname, '../elshadai.db');
 const db = new sqlite3.Database(dbPath);
 
+// Helper function to sync all products to Excel
+const triggerExcelSync = () => {
+    db.all('SELECT * FROM products', [], (err, rows) => {
+        if (!err) {
+            excelSync.syncInventory(rows);
+        }
+    });
+};
+
 // Search products
+// ... (keep existing search route)
 router.get('/search', authenticateToken, (req, res) => {
     const query = req.query.q || '';
     const sql = `SELECT * FROM products WHERE item_code LIKE ? OR description LIKE ? LIMIT 20`;
@@ -47,24 +59,9 @@ router.get('/', authenticateToken, (req, res) => {
     });
 });
 
-// Get single product
-router.get('/:id', authenticateToken, (req, res) => {
-    db.get(`SELECT * FROM products WHERE id = ?`, [req.params.id], (err, row) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        if (!row) {
-            return res.status(404).json({ message: 'Product not found' });
-        }
-        res.json(row);
-    });
-});
-
 // Update product (admin only)
 router.put('/:id', authenticateToken, adminOnly, (req, res) => {
     const { description, quantity, buying_price, regular_price, discount_price, low_stock_threshold } = req.body;
-
-    // Calculate profit
     const profit_per_item = regular_price - buying_price;
 
     db.run(
@@ -78,6 +75,10 @@ router.put('/:id', authenticateToken, adminOnly, (req, res) => {
         function (err) {
             if (err) return res.status(500).json({ error: 'Failed to update product' });
             if (this.changes === 0) return res.status(404).json({ error: 'Product not found' });
+
+            // Sync Excel in background
+            triggerExcelSync();
+
             res.json({ message: 'Product updated successfully' });
         }
     );
@@ -86,7 +87,6 @@ router.put('/:id', authenticateToken, adminOnly, (req, res) => {
 // Add new product (admin only)
 router.post('/', authenticateToken, adminOnly, (req, res) => {
     const { item_code, description, quantity, buying_price, regular_price, discount_price, low_stock_threshold } = req.body;
-
     const profit_per_item = regular_price - buying_price;
 
     db.run(
@@ -102,6 +102,10 @@ router.post('/', authenticateToken, adminOnly, (req, res) => {
                 }
                 return res.status(500).json({ error: 'Failed to add product' });
             }
+
+            // Sync Excel in background
+            triggerExcelSync();
+
             res.status(201).json({ id: this.lastID, message: 'Product added successfully' });
         }
     );
@@ -109,7 +113,6 @@ router.post('/', authenticateToken, adminOnly, (req, res) => {
 
 // Delete product (admin only)
 router.delete('/:id', authenticateToken, adminOnly, (req, res) => {
-    // First check if product has sales
     db.get(
         'SELECT COUNT(*) as count FROM sale_items WHERE product_id = ?',
         [req.params.id],
@@ -123,10 +126,13 @@ router.delete('/:id', authenticateToken, adminOnly, (req, res) => {
                 });
             }
 
-            // No sales, safe to delete
             db.run('DELETE FROM products WHERE id = ?', [req.params.id], function (err) {
                 if (err) return res.status(500).json({ error: 'Failed to delete product' });
                 if (this.changes === 0) return res.status(404).json({ error: 'Product not found' });
+
+                // Sync Excel in background
+                triggerExcelSync();
+
                 res.json({ message: 'Product deleted successfully' });
             });
         }
