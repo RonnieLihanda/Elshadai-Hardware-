@@ -93,4 +93,33 @@ const syncInventory = async (products) => {
     }
 };
 
+const exportInventory = async (products) => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Current Inventory');
+
+    sheet.columns = [
+        { header: 'Item Code', key: 'item_code', width: 15 },
+        { header: 'Description', key: 'description', width: 40 },
+        { header: 'Quantity', key: 'quantity', width: 10 },
+        { header: 'Buying Price', key: 'buying_price', width: 15 },
+        { header: 'Regular Price', key: 'regular_price', width: 15 },
+        { header: 'Discount Price', key: 'discount_price', width: 15 },
+        { header: 'Profit/Item', key: 'profit_per_item', width: 15 }
+    ];
+
+    products.forEach(p => {
+        sheet.addRow({
+            item_code: p.item_code,
+            description: p.description,
+            quantity: p.quantity,
+            buying_price: p.buying_price,
+            regular_price: p.regular_price,
+            discount_price: p.discount_price,
+            profit_per_item: p.profit_per_item
+        });
+    });
+
+    return workbook;
+};
+
 module.exports = { syncSale, exportInventory, syncInventory };
