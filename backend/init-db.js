@@ -72,7 +72,10 @@ CREATE TABLE IF NOT EXISTS receipts (
 );`;
 
 db.serialize(async () => {
-  // Drop products table for a fresh start with tiered pricing schema
+  // Drop tables for a fresh start with updated schema
+  db.run("DROP TABLE IF EXISTS receipts");
+  db.run("DROP TABLE IF EXISTS sale_items");
+  db.run("DROP TABLE IF EXISTS sales");
   db.run("DROP TABLE IF EXISTS products");
   // Ensure receipts table exists
   db.run(usersTable);

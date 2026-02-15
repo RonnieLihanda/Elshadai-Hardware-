@@ -212,8 +212,24 @@ function POS() {
   }, 0);
 
   const completeSale = async () => {
-    if (cart.length === 0) return;
+    console.log('=== ATTEMPTING SALE ===');
+    console.log('Cart items:', cart);
+
+    if (!cart || cart.length === 0) {
+      alert('Cart is empty!');
+      return;
+    }
+
+    // Validate all items have required fields
+    const invalidItems = cart.filter(item => !item.id || !item.quantity);
+    if (invalidItems.length > 0) {
+      console.error('Invalid items in cart:', invalidItems);
+      alert('Some items in cart are missing required data. Please refresh and try again.');
+      return;
+    }
+
     setCompleting(true);
+
     try {
       const saleItems = cart.map(item => {
         const effectivePrice = calculateItemPrice(item);
@@ -237,7 +253,12 @@ function POS() {
         total_profit: totalProfit
       };
 
+      console.log('Sending request to: http://localhost:5000/api/sales');
+      console.log('Sale Data:', saleData);
+
       const result = await api.createSale(saleData, token);
+      console.log('Sale successful:', result);
+
       setReceipt({
         ...result,
         items: saleItems,
@@ -246,9 +267,23 @@ function POS() {
         seller: user.fullName
       });
       setCart([]);
+      alert('Sale completed successfully!');
     } catch (err) {
-      console.error('Sale failed:', err);
-      alert(`Sale failed: ${err.message}. Please check if the backend is running and you have stock.`);
+      console.error('=== SALE FAILED ===');
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+
+      let errorMessage = 'Failed to complete sale. ';
+      if (err.message.toLocaleLowerCase().includes('fetch')) {
+        errorMessage += 'Cannot connect to server. Please ensure:\n' +
+          '1. Backend server is running (check terminal)\n' +
+          '2. Backend is on http://localhost:5000\n' +
+          '3. No firewall blocking the connection';
+      } else {
+        errorMessage += err.message;
+      }
+
+      alert(errorMessage);
     } finally {
       setCompleting(false);
     }
