@@ -48,8 +48,8 @@ const api = {
             body: JSON.stringify(saleData),
         });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Sale failed');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || errorData.message || `Server error (${response.status})`);
         }
         return response.json();
     },
@@ -62,11 +62,14 @@ const api = {
         return response.json();
     },
 
-    async getSalesHistory(token, startDate, endDate, seller_id) {
-        let url = `${API_URL}/sales?startDate=${startDate}&endDate=${endDate}`;
-        if (seller_id) url += `&seller_id=${seller_id}`;
+    async getSalesHistory(token, filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.startDate) params.append('startDate', filters.startDate);
+        if (filters.endDate) params.append('endDate', filters.endDate);
+        if (filters.paymentMethod && filters.paymentMethod !== 'all') params.append('paymentMethod', filters.paymentMethod);
+        if (filters.search) params.append('search', filters.search);
 
-        const response = await fetch(url, {
+        const response = await fetch(`${API_URL}/sales?${params.toString()}`, {
             headers: { 'Authorization': `Bearer ${token}` },
         });
         if (!response.ok) throw new Error('Failed to fetch sales history');
@@ -137,8 +140,8 @@ const api = {
             body: JSON.stringify({ new_password: newPassword }),
         });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Update failed');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || errorData.message || `Server error (${response.status})`);
         }
         return response.json();
     },
@@ -151,11 +154,101 @@ const api = {
         return response.json();
     },
 
+    async lookupCustomer(phone, token) {
+        const response = await fetch(`${API_URL}/customers/lookup?phone=${encodeURIComponent(phone)}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Customer not found');
+        }
+        return response.json();
+    },
+
+    async getAllCustomers(token, minPurchases = 0) {
+        const response = await fetch(`${API_URL}/customers?minPurchases=${minPurchases}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch customers');
+        return response.json();
+    },
+
+    async updateCustomerDiscount(id, discountData, token) {
+        const response = await fetch(`${API_URL}/customers/${id}/discount`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(discountData),
+        });
+        if (!response.ok) throw new Error('Failed to update customer discount');
+        return response.json();
+    },
+
+    async getCustomerPurchases(id, token) {
+        const response = await fetch(`${API_URL}/customers/${id}/purchases`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch purchase history');
+        return response.json();
+    },
+
     async exportInventory(token) {
         const response = await fetch(`${API_URL}/excel/export`, {
             headers: { 'Authorization': `Bearer ${token}` },
         });
         if (!response.ok) throw new Error('Export failed');
+        return response.blob();
+    },
+
+    async getSettings(token) {
+        const response = await fetch(`${API_URL}/settings`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch settings');
+        return response.json();
+    },
+
+    async updateSetting(token, key, value) {
+        const response = await fetch(`${API_URL}/settings/${key}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ value }),
+        });
+        if (!response.ok) throw new Error('Failed to update setting');
+        return response.json();
+    },
+
+    async getProductPerformance(token, period = 'today') {
+        const response = await fetch(`${API_URL}/dashboard/product-performance?period=${period}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch performance data');
+        return response.json();
+    },
+
+    async getAuditLogs(token, filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.limit) params.append('limit', filters.limit);
+        if (filters.itemCode) params.append('itemCode', filters.itemCode);
+        if (filters.type && filters.type !== 'all') params.append('type', filters.type);
+
+        const response = await fetch(`${API_URL}/audit?${params.toString()}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch audit logs');
+        return response.json();
+    },
+
+    async backupDatabase(token) {
+        const response = await fetch(`${API_URL}/admin/backup`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Backup failed');
         return response.blob();
     }
 };

@@ -38,11 +38,44 @@ CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   receipt_number TEXT UNIQUE NOT NULL,
   seller_id INTEGER NOT NULL,
+  customer_id INTEGER,
+  payment_method TEXT NOT NULL DEFAULT 'cash' CHECK(payment_method IN ('cash', 'mpesa')),
+  mpesa_reference TEXT,
   total_amount REAL NOT NULL,
   total_profit REAL NOT NULL,
   items_count INTEGER NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (seller_id) REFERENCES users(id)
+  FOREIGN KEY (seller_id) REFERENCES users(id),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);`;
+
+const customersTable = `
+CREATE TABLE IF NOT EXISTS customers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone_number TEXT UNIQUE NOT NULL,
+  name TEXT,
+  mpesa_purchases_count INTEGER DEFAULT 0,
+  total_mpesa_spent REAL DEFAULT 0,
+  total_purchases_count INTEGER DEFAULT 0,
+  total_spent REAL DEFAULT 0,
+  is_eligible_for_discount BOOLEAN DEFAULT 0,
+  discount_percentage REAL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_purchase_at DATETIME,
+  notes TEXT
+);`;
+
+const customerDiscountsTable = `
+CREATE TABLE IF NOT EXISTS customer_discounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL,
+  sale_id INTEGER NOT NULL,
+  discount_amount REAL NOT NULL,
+  discount_percentage REAL NOT NULL,
+  applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (sale_id) REFERENCES sales(id)
 );`;
 
 const saleItemsTable = `
@@ -73,15 +106,20 @@ CREATE TABLE IF NOT EXISTS receipts (
 
 db.serialize(async () => {
   // Drop tables for a fresh start with updated schema
+  db.run("DROP TABLE IF EXISTS customer_discounts");
   db.run("DROP TABLE IF EXISTS receipts");
   db.run("DROP TABLE IF EXISTS sale_items");
   db.run("DROP TABLE IF EXISTS sales");
   db.run("DROP TABLE IF EXISTS products");
-  // Ensure receipts table exists
+  db.run("DROP TABLE IF EXISTS customers");
+
+  // Ensure tables exist
   db.run(usersTable);
+  db.run(customersTable);
   db.run(productsTable);
   db.run(salesTable);
   db.run(saleItemsTable);
+  db.run(customerDiscountsTable);
   db.run(receiptsTable);
 
   console.log("Tables created successfully.");

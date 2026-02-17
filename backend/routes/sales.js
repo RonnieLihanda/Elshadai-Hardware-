@@ -4,6 +4,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const authenticateToken = require('../middleware/auth');
 const excelSync = require('../utils/excelSync');
+const { logInventoryChange } = require('../utils/inventoryAudit');
 
 const dbPath = path.join(__dirname, '../elshadai.db');
 const db = new sqlite3.Database(dbPath);
@@ -11,164 +12,247 @@ const db = new sqlite3.Database(dbPath);
 // Create a new sale
 router.post('/', authenticateToken, async (req, res) => {
     console.log('=== SALE REQUEST RECEIVED ===');
-    console.log('User:', req.user.username);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
 
-    const { items, total_amount, total_profit } = req.body;
+    const { items, total_amount, total_profit, payment_method, mpesa_reference, customer_phone, manual_discount = 0 } = req.body;
+
+    // Validation
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Sale must contain at least one item' });
+    }
+    if (isNaN(total_amount) || total_amount < 0) {
+        return res.status(400).json({ error: 'Invalid total amount' });
+    }
+    if (isNaN(manual_discount) || manual_discount < 0) {
+        return res.status(400).json({ error: 'Invalid manual discount' });
+    }
+
     const seller_id = req.user.id;
     const receipt_number = `RCP-${Date.now()}`;
 
     if (!items || items.length === 0) {
         console.log('ERROR: No items in cart');
-        return res.status(400).json({ message: 'No items in cart' });
+        return res.status(400).json({ error: 'No items in cart' });
+    }
+
+    // Validate payment method
+    if (!['cash', 'mpesa'].includes(payment_method)) {
+        return res.status(400).json({ error: 'Invalid payment method' });
+    }
+
+    // If M-Pesa, require phone number (optional: based on UI preference, but good practice)
+    if (payment_method === 'mpesa' && !customer_phone) {
+        return res.status(400).json({ error: 'Phone number required for M-Pesa' });
     }
 
     try {
-        // 1. Verify all products and stock first
+        const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
+            db.run(sql, params, function (err) {
+                if (err) reject(err);
+                else resolve(this);
+            });
+        });
+
+        const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
+            db.get(sql, params, (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+
+        // 1. Verify Stock & Prepare Items
         console.log(`Verifying stock for ${items.length} items...`);
         const processedItems = [];
-
         for (const item of items) {
-            const product = await new Promise((resolve, reject) => {
-                db.get('SELECT * FROM products WHERE id = ?', [item.product_id], (err, row) => {
-                    if (err) reject(err);
-                    else resolve(row);
-                });
-            });
-
-            if (!product) {
-                throw new Error(`Product not found: ${item.description || item.item_code}`);
-            }
-
-            if (product.quantity < item.quantity) {
-                throw new Error(`Insufficient stock for ${product.description}. Available: ${product.quantity}, Requested: ${item.quantity}`);
-            }
-
-            // Calculate/Verify info
-            const discount_threshold = product.discount_threshold || 7;
-            const discount_applied = item.quantity >= discount_threshold;
+            const product = await dbGet('SELECT * FROM products WHERE id = ?', [item.product_id || item.id]);
+            if (!product) throw new Error(`Product not found: ${item.description}`);
+            if (product.quantity < item.quantity) throw new Error(`Insufficient stock for ${product.description}.`);
 
             processedItems.push({
                 ...item,
                 product_id: product.id,
                 item_code: product.item_code,
                 description: product.description,
-                discount_applied
+                buying_price: product.buying_price,
+                discount_applied: item.quantity >= (product.discount_threshold || 7)
             });
         }
 
-        console.log('Stock verification passed. Starting transaction...');
+        // 2. Handle Customer for M-Pesa
+        let customerId = null;
+        let customerDiscountPercent = 0;
+        let cleanPhone = null;
 
-        // 2. Perform Transaction
-        const result = await new Promise((resolve, reject) => {
-            db.serialize(() => {
-                db.run('BEGIN TRANSACTION', (err) => {
-                    if (err) return reject(err);
-                });
+        if (customer_phone) {
+            cleanPhone = customer_phone.replace(/\s+/g, '');
+            if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
 
-                const salesSql = `INSERT INTO sales (receipt_number, seller_id, total_amount, total_profit, items_count) VALUES (?, ?, ?, ?, ?)`;
-                db.run(salesSql, [receipt_number, seller_id, total_amount, total_profit, items.length], function (err) {
-                    if (err) {
-                        db.run('ROLLBACK');
-                        return reject(err);
-                    }
+            let customer = await dbGet('SELECT * FROM customers WHERE phone_number = ?', [cleanPhone]);
 
-                    const sale_id = this.lastID;
-                    console.log(`Sale created with ID: ${sale_id}. Processing items...`);
+            if (customer) {
+                customerId = customer.id;
+                if (customer.is_eligible_for_discount) customerDiscountPercent = customer.discount_percentage;
+            } else {
+                // Create new customer
+                const custRes = await dbRun(
+                    'INSERT INTO customers (phone_number, created_at) VALUES (?, datetime("now"))',
+                    [cleanPhone]
+                );
+                customerId = custRes.lastID;
+            }
+        }
 
-                    const itemSql = `INSERT INTO sale_items (sale_id, product_id, item_code, description, quantity, unit_price, total_price, profit, discount_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-                    const updateSql = `UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+        // Apply customer discount if any
+        let discountAmount = 0;
+        let finalTotal = total_amount;
+        let finalProfit = total_profit;
 
-                    let itemsProcessed = 0;
-                    let hasError = false;
+        if (customerDiscountPercent > 0) {
+            discountAmount = (total_amount * customerDiscountPercent) / 100;
+            finalTotal = total_amount - discountAmount;
+            finalProfit = total_profit - discountAmount;
+        }
 
-                    processedItems.forEach((item) => {
-                        if (hasError) return;
+        // 3. Start Transaction
+        console.log('Stock verified. Starting transaction...');
+        await dbRun('BEGIN TRANSACTION');
 
-                        db.run(itemSql, [
-                            sale_id, item.product_id, item.item_code, item.description,
-                            item.quantity, item.unit_price, item.total_price, item.profit,
-                            item.discount_applied ? 1 : 0
-                        ], (err) => {
-                            if (err && !hasError) {
-                                hasError = true;
-                                db.run('ROLLBACK');
-                                return reject(new Error(`Failed to insert sale item ${item.item_code}: ${err.message}`));
-                            }
+        try {
+            // Insert Sale
+            const saleRes = await dbRun(
+                `INSERT INTO sales (receipt_number, seller_id, customer_id, payment_method, mpesa_reference, total_amount, total_profit, items_count, manual_discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [receipt_number, seller_id, customerId, payment_method, mpesa_reference, finalTotal, finalProfit, items.length, manual_discount]
+            );
+            const sale_id = saleRes.lastID;
 
-                            db.run(updateSql, [item.quantity, item.product_id], (err) => {
-                                if (err && !hasError) {
-                                    hasError = true;
-                                    db.run('ROLLBACK');
-                                    return reject(new Error(`Failed to update stock for ${item.item_code}: ${err.message}`));
-                                }
+            // Insert Items and Update Stock
+            for (const item of processedItems) {
+                await dbRun(
+                    `INSERT INTO sale_items (sale_id, product_id, item_code, description, quantity, unit_price, total_price, profit, discount_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [sale_id, item.product_id, item.item_code, item.description, item.quantity, item.unit_price, item.total_price, item.profit, item.discount_applied ? 1 : 0]
+                );
+                await dbRun(`UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [item.quantity, item.product_id]);
 
-                                itemsProcessed++;
-                                if (itemsProcessed === processedItems.length && !hasError) {
-                                    db.run('COMMIT', (err) => {
-                                        if (err) {
-                                            db.run('ROLLBACK');
-                                            return reject(err);
-                                        }
-                                        console.log('Transaction committed successfully');
-                                        resolve({ sale_id, receipt_number });
-                                    });
-                                }
-                            });
-                        });
-                    });
-                });
+                // Audit log
+                const product = await dbGet('SELECT quantity FROM products WHERE id = ?', [item.product_id]);
+                logInventoryChange(
+                    item.product_id,
+                    item.item_code,
+                    item.description,
+                    'SALE',
+                    -item.quantity,
+                    product.quantity + item.quantity,
+                    product.quantity,
+                    seller_id,
+                    `Sale ${receipt_number}`
+                );
+            }
+
+            // Record customer discount if applied
+            if (discountAmount > 0 && customerId) {
+                await dbRun(
+                    'INSERT INTO customer_discounts (customer_id, sale_id, discount_amount, discount_percentage) VALUES (?, ?, ?, ?)',
+                    [customerId, sale_id, discountAmount, customerDiscountPercent]
+                );
+            }
+
+            // Update customer stats
+            if (customerId) {
+                const mpesa_inc = payment_method === 'mpesa' ? 1 : 0;
+                const mpesa_spent = payment_method === 'mpesa' ? finalTotal : 0;
+                await dbRun(
+                    `UPDATE customers 
+                     SET mpesa_purchases_count = mpesa_purchases_count + ?, 
+                         total_mpesa_spent = total_mpesa_spent + ?,
+                         total_purchases_count = total_purchases_count + 1,
+                         total_spent = total_spent + ?,
+                         last_purchase_at = datetime('now')
+                     WHERE id = ?`,
+                    [mpesa_inc, mpesa_spent, finalTotal, customerId]
+                );
+            }
+
+            await dbRun('COMMIT');
+            console.log('Transaction committed.');
+
+            // Post-sale background tasks
+            const receiptData = {
+                receipt_number,
+                seller_name: req.user.full_name,
+                items: processedItems,
+                total_amount: finalTotal,
+                original_amount: total_amount,
+                discount_amount: discountAmount,
+                discount_percentage: customerDiscountPercent,
+                payment_method,
+                mpesa_reference,
+                customer_phone: cleanPhone,
+                created_at: new Date().toISOString()
+            };
+
+            db.run(`INSERT INTO receipts (receipt_number, sale_id, receipt_data) VALUES (?, ?, ?)`,
+                [receipt_number, sale_id, JSON.stringify(receiptData)],
+                (err) => { if (err) console.error('Receipt persist error:', err); }
+            );
+
+            excelSync.syncSale(receipt_number, req.user.full_name, processedItems, finalTotal);
+
+            res.status(201).json({
+                id: sale_id,
+                receipt_number,
+                message: 'Sale completed successfully',
+                ...receiptData
             });
-        });
 
-        console.log('=== SALE COMPLETED SUCCESSFULLY ===');
-
-        // 3. Post-transaction operations
-        // Prepare receipt data
-        const receiptData = {
-            receipt_number: result.receipt_number,
-            seller: req.user.fullName,
-            items: processedItems,
-            total_amount,
-            created_at: new Date().toISOString()
-        };
-
-        // Persist receipt data in background
-        db.run(`INSERT INTO receipts (receipt_number, sale_id, receipt_data) VALUES (?, ?, ?)`,
-            [result.receipt_number, result.sale_id, JSON.stringify(receiptData)],
-            (err) => { if (err) console.error('Error persisting receipt:', err.message); }
-        );
-
-        // Sync Excel in background
-        excelSync.syncSale(result.receipt_number, req.user.fullName, processedItems, total_amount);
-
-        res.status(201).json({
-            id: result.sale_id,
-            receipt_number: result.receipt_number,
-            message: 'Sale completed successfully'
-        });
+        } catch (err) {
+            console.error('Transaction failed, rolling back:', err.message);
+            await dbRun('ROLLBACK');
+            throw err;
+        }
 
     } catch (error) {
-        console.error('=== SALE FAILED ===');
-        console.error('Error:', error.message);
+        console.error('=== SALE FAILED ===', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Get sales history
+// Get sales history with filters
 router.get('/', authenticateToken, (req, res) => {
-    const startDate = req.query.startDate || '1970-01-01';
-    const endDate = req.query.endDate || '2100-12-31';
-    const seller_id = req.query.seller_id;
+    const { startDate, endDate, paymentMethod, search } = req.query;
 
-    let sql = `SELECT s.*, u.full_name as seller_name FROM sales s JOIN users u ON s.seller_id = u.id WHERE DATE(s.created_at) BETWEEN ? AND ?`;
-    let params = [startDate, endDate];
+    let sql = `
+        SELECT 
+            s.*, 
+            u.full_name as seller_name,
+            c.phone_number as customer_phone
+        FROM sales s 
+        JOIN users u ON s.seller_id = u.id 
+        LEFT JOIN customers c ON s.customer_id = c.id
+        WHERE 1=1
+    `;
+    const params = [];
 
-    if (seller_id) {
-        sql += ` AND s.seller_id = ?`;
-        params.push(seller_id);
+    if (startDate) {
+        sql += ` AND DATE(s.created_at) >= ?`;
+        params.push(startDate);
     }
 
-    sql += ` ORDER BY s.created_at DESC`;
+    if (endDate) {
+        sql += ` AND DATE(s.created_at) <= ?`;
+        params.push(endDate);
+    }
+
+    if (paymentMethod && paymentMethod !== 'all') {
+        sql += ` AND s.payment_method = ?`;
+        params.push(paymentMethod);
+    }
+
+    if (search) {
+        sql += ` AND (s.receipt_number LIKE ? OR c.phone_number LIKE ?)`;
+        params.push(`%${search}%`, `%${search}%`);
+    }
+
+    sql += ` ORDER BY s.created_at DESC LIMIT 500`;
 
     db.all(sql, params, (err, rows) => {
         if (err) {

@@ -10,12 +10,15 @@ const db = new sqlite3.Database(dbPath);
 
 router.get('/stats', authenticateToken, adminOnly, (req, res) => {
     const period = req.query.period || 'today';
-    let dateFilter = "date('now')";
+    console.log(`=== DASHBOARD STATS REQUEST: ${period} ===`);
 
+    let dateFilter = "date(created_at) = date('now')";
     if (period === 'week') {
-        dateFilter = "date('now', 'weekday 0', '-7 days')";
+        dateFilter = "created_at >= date('now', '-7 days')";
     } else if (period === 'month') {
-        dateFilter = "date('now', 'start of month')";
+        dateFilter = "created_at >= date('now', '-30 days')";
+    } else if (period === 'all') {
+        dateFilter = "1=1";
     }
 
     const statsSql = `
@@ -24,49 +27,96 @@ router.get('/stats', authenticateToken, adminOnly, (req, res) => {
             SUM(total_profit) as totalProfit,
             COUNT(id) as transactionCount
         FROM sales 
-        WHERE created_at >= ${period === 'today' ? "date('now')" : dateFilter}
+        WHERE ${dateFilter}
     `;
 
-    const inventorySql = `
-        SELECT 
-            COUNT(*) as lowStockCount,
-            SUM(quantity * selling_price) as totalInventoryValue
-        FROM products
-        WHERE quantity <= low_stock_threshold OR 1=1 -- For total value
-    `;
-
-    // Special query for low stock count only
     const lowStockSql = `SELECT COUNT(*) as count FROM products WHERE quantity <= low_stock_threshold`;
+    const inventoryValueSql = `SELECT SUM(quantity * regular_price) as totalValue FROM products`;
+    const topProductsSql = `
+        SELECT si.description, si.item_code, SUM(si.quantity) as totalSold
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        WHERE ${dateFilter.replace('created_at', 's.created_at')}
+        GROUP BY si.product_id
+        ORDER BY totalSold DESC
+        LIMIT 5
+    `;
 
     db.get(statsSql, (err, stats) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('Stats SQL error:', err);
+            return res.status(500).json({ error: err.message });
+        }
 
         db.get(lowStockSql, (err, lowStock) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) {
+                console.error('Low Stock SQL error:', err);
+                return res.status(500).json({ error: err.message });
+            }
 
-            db.get(`SELECT SUM(quantity * selling_price) as totalValue FROM products`, (err, inventory) => {
-                if (err) return res.status(500).json({ error: err.message });
+            db.get(inventoryValueSql, (err, inventory) => {
+                if (err) {
+                    console.error('Inventory Value SQL error:', err);
+                    return res.status(500).json({ error: err.message });
+                }
 
-                db.all(`
-                    SELECT description, item_code, SUM(quantity) as totalSold
-                    FROM sale_items
-                    GROUP BY product_id
-                    ORDER BY totalSold DESC
-                    LIMIT 5
-                `, (err, topProducts) => {
-                    if (err) return res.status(500).json({ error: err.message });
+                db.all(topProductsSql, (err, topProducts) => {
+                    if (err) {
+                        console.error('Top Products SQL error:', err);
+                        return res.status(500).json({ error: err.message });
+                    }
 
-                    res.json({
+                    const response = {
                         totalSales: stats.totalSales || 0,
                         totalProfit: stats.totalProfit || 0,
                         transactionCount: stats.transactionCount || 0,
                         lowStockCount: lowStock.count || 0,
                         totalInventoryValue: inventory.totalValue || 0,
-                        topProducts: topProducts
-                    });
+                        topProducts: topProducts || []
+                    };
+
+                    console.log('Dashboard response prepared successfully');
+                    res.json(response);
                 });
             });
         });
+    });
+});
+
+router.get('/product-performance', authenticateToken, adminOnly, (req, res) => {
+    const period = req.query.period || 'today';
+
+    let dateFilter = "date(s.created_at) = date('now')";
+    if (period === 'week') {
+        dateFilter = "s.created_at >= date('now', '-7 days')";
+    } else if (period === 'month') {
+        dateFilter = "s.created_at >= date('now', '-30 days')";
+    } else if (period === 'all') {
+        dateFilter = "1=1";
+    }
+
+    const sql = `
+        SELECT 
+            p.description,
+            p.item_code,
+            p.quantity as current_stock,
+            SUM(si.quantity) as total_sold,
+            SUM(si.total_price) as total_revenue,
+            SUM(si.profit) as total_profit
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        JOIN products p ON si.product_id = p.id
+        WHERE ${dateFilter}
+        GROUP BY si.product_id
+        ORDER BY total_sold DESC
+        LIMIT 10
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
     });
 });
 
