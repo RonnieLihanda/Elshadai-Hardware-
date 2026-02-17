@@ -1,10 +1,12 @@
-node_modules
-dist
+node_modules/
+dist/
+build/
 .env
+.env.local
+.env.production
+.env.test
 backend/elshadai.db
 backend/*.log
-frontend/dist
-.DS_Store
 *.xlsx
 # Keep the main inventory file but exclude others
 !Elshadai's Hardware Musembe.xlsx
