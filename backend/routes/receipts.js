@@ -1,28 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const db = require('../config/db');
 const authenticateToken = require('../middleware/auth');
 const adminOnly = require('../middleware/admin');
 
-const dbPath = path.join(__dirname, '../elshadai.db');
-const db = new sqlite3.Database(dbPath);
-
 // List all receipts (admin only)
-router.get('/', authenticateToken, adminOnly, (req, res) => {
-    db.all(`SELECT * FROM receipts ORDER BY created_at DESC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+router.get('/', authenticateToken, adminOnly, async (req, res) => {
+    try {
+        const { rows } = await db.query(`SELECT * FROM receipts ORDER BY created_at DESC`);
         res.json(rows);
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Get specific receipt by receipt_number
-router.get('/:receipt_number', authenticateToken, (req, res) => {
-    db.get(`SELECT * FROM receipts WHERE receipt_number = ?`, [req.params.receipt_number], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
+router.get('/:receipt_number', authenticateToken, async (req, res) => {
+    try {
+        const { rows } = await db.query(`SELECT * FROM receipts WHERE receipt_number = $1`, [req.params.receipt_number]);
+        const row = rows[0];
         if (!row) return res.status(404).json({ message: 'Receipt not found' });
         res.json(JSON.parse(row.receipt_data));
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;

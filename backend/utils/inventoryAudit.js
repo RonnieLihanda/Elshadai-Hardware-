@@ -1,6 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const dbPath = path.join(__dirname, '../elshadai.db');
+const db = require('../config/db');
 
 /**
  * Logs a change in inventory
@@ -14,18 +12,18 @@ const dbPath = path.join(__dirname, '../elshadai.db');
  * @param {number} userId 
  * @param {string} notes 
  */
-function logInventoryChange(productId, itemCode, description, type, changeQty, beforeQty, afterQty, userId, notes = '') {
-    const db = new sqlite3.Database(dbPath);
+async function logInventoryChange(productId, itemCode, description, type, changeQty, beforeQty, afterQty, userId, notes = '') {
     const sql = `
         INSERT INTO inventory_audit 
         (product_id, item_code, description, change_type, quantity_changed, before_quantity, after_quantity, user_id, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `;
 
-    db.run(sql, [productId, itemCode, description, type, changeQty, beforeQty, afterQty, userId, notes], (err) => {
-        if (err) console.error('FAILED TO LOG INVENTORY AUDIT:', err.message);
-        db.close();
-    });
+    try {
+        await db.query(sql, [productId, itemCode, description, type, changeQty, beforeQty, afterQty, userId, notes]);
+    } catch (err) {
+        console.error('FAILED TO LOG INVENTORY AUDIT:', err.message);
+    }
 }
 
 module.exports = { logInventoryChange };

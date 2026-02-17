@@ -1,96 +1,81 @@
 const express = require('express');
 const router = express.Router();
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const db = require('../config/db');
 const authenticateToken = require('../middleware/auth');
 const adminOnly = require('../middleware/admin');
 
-const dbPath = path.join(__dirname, '../elshadai.db');
-const db = new sqlite3.Database(dbPath);
-
-router.get('/stats', authenticateToken, adminOnly, (req, res) => {
+router.get('/stats', authenticateToken, adminOnly, async (req, res) => {
     const period = req.query.period || 'today';
     console.log(`=== DASHBOARD STATS REQUEST: ${period} ===`);
 
-    let dateFilter = "date(created_at) = date('now')";
+    let dateFilter = "created_at::date = CURRENT_DATE";
     if (period === 'week') {
-        dateFilter = "created_at >= date('now', '-7 days')";
+        dateFilter = "created_at >= CURRENT_DATE - INTERVAL '7 days'";
     } else if (period === 'month') {
-        dateFilter = "created_at >= date('now', '-30 days')";
+        dateFilter = "created_at >= CURRENT_DATE - INTERVAL '30 days'";
     } else if (period === 'all') {
         dateFilter = "1=1";
     }
 
-    const statsSql = `
-        SELECT 
-            SUM(total_amount) as totalSales,
-            SUM(total_profit) as totalProfit,
-            COUNT(id) as transactionCount
-        FROM sales 
-        WHERE ${dateFilter}
-    `;
+    try {
+        const statsSql = `
+            SELECT 
+                SUM(total_amount) as "totalSales",
+                SUM(total_profit) as "totalProfit",
+                COUNT(id) as "transactionCount"
+            FROM sales 
+            WHERE ${dateFilter}
+        `;
 
-    const lowStockSql = `SELECT COUNT(*) as count FROM products WHERE quantity <= low_stock_threshold`;
-    const inventoryValueSql = `SELECT SUM(quantity * regular_price) as totalValue FROM products`;
-    const topProductsSql = `
-        SELECT si.description, si.item_code, SUM(si.quantity) as totalSold
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.id
-        WHERE ${dateFilter.replace('created_at', 's.created_at')}
-        GROUP BY si.product_id
-        ORDER BY totalSold DESC
-        LIMIT 5
-    `;
+        const lowStockSql = `SELECT COUNT(*) as count FROM products WHERE quantity <= low_stock_threshold`;
+        const inventoryValueSql = `SELECT SUM(quantity * regular_price) as "totalValue" FROM products`;
 
-    db.get(statsSql, (err, stats) => {
-        if (err) {
-            console.error('Stats SQL error:', err);
-            return res.status(500).json({ error: err.message });
-        }
+        const topProductsSql = `
+            SELECT si.description, si.item_code, SUM(si.quantity) as "totalSold"
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            WHERE ${dateFilter.replace('created_at', 's.created_at')}
+            GROUP BY si.product_id, si.description, si.item_code
+            ORDER BY "totalSold" DESC
+            LIMIT 5
+        `;
 
-        db.get(lowStockSql, (err, lowStock) => {
-            if (err) {
-                console.error('Low Stock SQL error:', err);
-                return res.status(500).json({ error: err.message });
-            }
+        const [statsRes, lowStockRes, inventoryRes, topProductsRes] = await Promise.all([
+            db.query(statsSql),
+            db.query(lowStockSql),
+            db.query(inventoryValueSql),
+            db.query(topProductsSql)
+        ]);
 
-            db.get(inventoryValueSql, (err, inventory) => {
-                if (err) {
-                    console.error('Inventory Value SQL error:', err);
-                    return res.status(500).json({ error: err.message });
-                }
+        const stats = statsRes.rows[0];
+        const lowStock = lowStockRes.rows[0];
+        const inventory = inventoryRes.rows[0];
+        const topProducts = topProductsRes.rows;
 
-                db.all(topProductsSql, (err, topProducts) => {
-                    if (err) {
-                        console.error('Top Products SQL error:', err);
-                        return res.status(500).json({ error: err.message });
-                    }
+        const response = {
+            totalSales: parseFloat(stats.totalSales) || 0,
+            totalProfit: parseFloat(stats.totalProfit) || 0,
+            transactionCount: parseInt(stats.transactionCount) || 0,
+            lowStockCount: parseInt(lowStock.count) || 0,
+            totalInventoryValue: parseFloat(inventory.totalValue) || 0,
+            topProducts: topProducts || []
+        };
 
-                    const response = {
-                        totalSales: stats.totalSales || 0,
-                        totalProfit: stats.totalProfit || 0,
-                        transactionCount: stats.transactionCount || 0,
-                        lowStockCount: lowStock.count || 0,
-                        totalInventoryValue: inventory.totalValue || 0,
-                        topProducts: topProducts || []
-                    };
-
-                    console.log('Dashboard response prepared successfully');
-                    res.json(response);
-                });
-            });
-        });
-    });
+        res.json(response);
+    } catch (err) {
+        console.error('Dashboard Stats Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
-router.get('/product-performance', authenticateToken, adminOnly, (req, res) => {
+router.get('/product-performance', authenticateToken, adminOnly, async (req, res) => {
     const period = req.query.period || 'today';
 
-    let dateFilter = "date(s.created_at) = date('now')";
+    let dateFilter = "s.created_at::date = CURRENT_DATE";
     if (period === 'week') {
-        dateFilter = "s.created_at >= date('now', '-7 days')";
+        dateFilter = "s.created_at >= CURRENT_DATE - INTERVAL '7 days'";
     } else if (period === 'month') {
-        dateFilter = "s.created_at >= date('now', '-30 days')";
+        dateFilter = "s.created_at >= CURRENT_DATE - INTERVAL '30 days'";
     } else if (period === 'all') {
         dateFilter = "1=1";
     }
@@ -107,17 +92,17 @@ router.get('/product-performance', authenticateToken, adminOnly, (req, res) => {
         JOIN sales s ON si.sale_id = s.id
         JOIN products p ON si.product_id = p.id
         WHERE ${dateFilter}
-        GROUP BY si.product_id
+        GROUP BY si.product_id, p.description, p.item_code, p.quantity
         ORDER BY total_sold DESC
         LIMIT 10
     `;
 
-    db.all(sql, [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
+    try {
+        const { rows } = await db.query(sql);
         res.json(rows);
-    });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;

@@ -1,15 +1,10 @@
 const cron = require('node-cron');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const db = require('../config/db');
 const { sendLowStockAlert } = require('../services/emailService');
-
-const dbPath = path.join(__dirname, '../elshadai.db');
-const db = new sqlite3.Database(dbPath);
 
 // Check for low stock items
 const checkLowStock = async () => {
-    return new Promise((resolve, reject) => {
-        const query = `
+    const query = `
       SELECT 
         id,
         item_code,
@@ -29,14 +24,8 @@ const checkLowStock = async () => {
         quantity ASC
     `;
 
-        db.all(query, [], (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(rows);
-            }
-        });
-    });
+    const { rows } = await db.query(query);
+    return rows;
 };
 
 // Schedule daily low stock check
@@ -65,11 +54,15 @@ const startLowStockMonitoring = () => {
                 if (result.success) {
                     console.log(`✓ Low stock alert sent to ${adminEmail}`);
 
-                    // Log notification in database if audit_log exists
-                    db.run(
-                        "INSERT INTO audit_log (user_id, action, details) SELECT NULL, ?, ? WHERE EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='audit_log')",
-                        ['low_stock_email_sent', JSON.stringify({ items_count: lowStockItems.length, email: adminEmail })]
-                    );
+                    // Log notification in database - updated for PostgreSQL
+                    try {
+                        await db.query(
+                            "INSERT INTO inventory_audit (product_id, item_code, description, change_type, quantity_changed, before_quantity, after_quantity, user_id, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                            [0, 'SYSTEM', 'Low Stock Alert', 'NOTIFICATION', 0, 0, 0, 1, `Email sent to ${adminEmail}`]
+                        );
+                    } catch (auditErr) {
+                        console.error('Failed to log low stock notification to audit:', auditErr.message);
+                    }
                 } else {
                     console.error('✗ Failed to send low stock alert:', result.error);
                 }

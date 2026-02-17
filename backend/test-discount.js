@@ -1,15 +1,14 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-
-const dbPath = path.join(__dirname, 'elshadai.db');
-const db = new sqlite3.Database(dbPath);
+const db = require('./config/db');
 
 async function testDiscount() {
-    console.log("--- Testing Bulk Discount Logic ---");
+    console.log("--- Testing Bulk Discount Logic (PostgreSQL) ---");
 
-    // Get a product
-    db.get("SELECT * FROM products LIMIT 1", (err, product) => {
-        if (err || !product) {
+    try {
+        // Get a product
+        const { rows } = await db.query("SELECT * FROM products LIMIT 1");
+        const product = rows[0];
+
+        if (!product) {
             console.error("No products found");
             process.exit(1);
         }
@@ -27,14 +26,16 @@ async function testDiscount() {
         const priceS2 = product.discount_price;
         console.log(`Scenario 2: ${qtyS2} items -> Expected Price: ${priceS2}`);
 
-        if (priceS2 < priceS1) {
+        if (parseFloat(priceS2) < parseFloat(priceS1)) {
             console.log("✓ Schema supports tiered pricing.");
         } else {
             console.log("✗ Discount price should be lower than regular price.");
         }
-
-        db.close();
-    });
+    } catch (err) {
+        console.error("Test failed:", err.message);
+    } finally {
+        process.exit();
+    }
 }
 
 testDiscount();

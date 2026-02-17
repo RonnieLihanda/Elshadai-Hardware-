@@ -2,11 +2,10 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const db = require('../config/db');
 const authenticateToken = require('../middleware/auth');
 const isAdmin = require('../middleware/admin');
 
-// Path to the database file
-const DB_PATH = path.join(__dirname, '../../elshadai.db');
 const BACKUP_DIR = path.join(__dirname, '../../backups');
 
 // Ensure backup directory exists
@@ -16,17 +15,26 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 /**
  * @route   GET /api/admin/backup
- * @desc    Create a database backup and download it
+ * @desc    Create a JSON database backup and download it
  * @access  Admin
  */
-router.get('/backup', authenticateToken, isAdmin, (req, res) => {
+router.get('/backup', authenticateToken, isAdmin, async (req, res) => {
     try {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupFile = `elshadai_backup_${timestamp}.db`;
+        const backupFile = `elshadai_data_backup_${timestamp}.json`;
         const backupPath = path.join(BACKUP_DIR, backupFile);
 
-        // Copy the database file
-        fs.copyFileSync(DB_PATH, backupPath);
+        // Fetch all data from main tables
+        const tables = ['users', 'products', 'customers', 'sales', 'sale_items', 'settings', 'inventory_audit'];
+        const backupData = {};
+
+        for (const table of tables) {
+            const { rows } = await db.query(`SELECT * FROM ${table}`);
+            backupData[table] = rows;
+        }
+
+        // Save to JSON file
+        fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2));
 
         res.download(backupPath, backupFile, (err) => {
             if (err) {
@@ -42,14 +50,11 @@ router.get('/backup', authenticateToken, isAdmin, (req, res) => {
 
 /**
  * @route   POST /api/admin/restore
- * @desc    Restore database from an uploaded file
+ * @desc    Restore database from an uploaded JSON file
  * @access  Admin
  */
 router.post('/restore', authenticateToken, isAdmin, (req, res) => {
-    // Note: In a real production environment, this would involve file upload (e.g., multer)
-    // and potentially a server restart. For this local POS, we'll provide the logic 
-    // but advise caution as it overwrites current data.
-    res.status(501).json({ message: 'Restore functionality requires manual database replacement for safety. Please contact support.' });
+    res.status(501).json({ message: 'Restore functionality for PostgreSQL requires manual import for safety. Please use Supabase dashboard or contact support.' });
 });
 
 module.exports = router;

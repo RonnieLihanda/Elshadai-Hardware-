@@ -1,15 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const db = require('../config/db');
 const authenticateToken = require('../middleware/auth');
 const adminOnly = require('../middleware/admin');
 
-const dbPath = path.join(__dirname, '../elshadai.db');
-const db = new sqlite3.Database(dbPath);
-
 // Get audit logs (admin only)
-router.get('/', authenticateToken, adminOnly, (req, res) => {
+router.get('/', authenticateToken, adminOnly, async (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
     const { itemCode, type } = req.query;
 
@@ -22,21 +18,23 @@ router.get('/', authenticateToken, adminOnly, (req, res) => {
     const params = [];
 
     if (itemCode) {
-        sql += ` AND a.item_code = ?`;
+        sql += ` AND a.item_code = $${params.length + 1}`;
         params.push(itemCode);
     }
     if (type && type !== 'all') {
-        sql += ` AND a.change_type = ?`;
+        sql += ` AND a.change_type = $${params.length + 1}`;
         params.push(type);
     }
 
-    sql += ` ORDER BY a.created_at DESC LIMIT ?`;
+    sql += ` ORDER BY a.created_at DESC LIMIT $${params.length + 1}`;
     params.push(limit);
 
-    db.all(sql, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+    try {
+        const { rows } = await db.query(sql, params);
         res.json(rows);
-    });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;
