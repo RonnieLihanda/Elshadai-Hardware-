@@ -1,30 +1,40 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const api = {
     async login(username, password) {
-        const response = await fetch(`${API_URL}/auth/login`, {
+        const response = await fetch(`${API_URL}/auth-login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
             body: JSON.stringify({ username, password }),
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'Login failed');
+            throw new Error(error.message || error.error || 'Login failed');
         }
         return response.json();
     },
 
     async getMe(token) {
-        const response = await fetch(`${API_URL}/auth/me`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(`${API_URL}/auth-me`, {
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch user');
         return response.json();
     },
 
     async searchProducts(query, token) {
-        const response = await fetch(`${API_URL}/products/search?q=${encodeURIComponent(query)}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(`${API_URL}/products?q=${encodeURIComponent(query)}`, {
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Search failed');
         return response.json();
@@ -32,7 +42,10 @@ const api = {
 
     async getAllProducts(token, page = 1, limit = 50, lowStock = false) {
         const response = await fetch(`${API_URL}/products?page=${page}&limit=${limit}&lowStock=${lowStock}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch products');
         return response.json();
@@ -43,7 +56,8 @@ const api = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify(saleData),
         });
@@ -55,8 +69,11 @@ const api = {
     },
 
     async getDashboardStats(token, period = 'today') {
-        const response = await fetch(`${API_URL}/dashboard/stats?period=${period}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(`${API_URL}/dashboard?action=stats&period=${period}`, {
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch stats');
         return response.json();
@@ -70,7 +87,10 @@ const api = {
         if (filters.search) params.append('search', filters.search);
 
         const response = await fetch(`${API_URL}/sales?${params.toString()}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch sales history');
         return response.json();
@@ -81,7 +101,8 @@ const api = {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify(productData),
         });
@@ -94,7 +115,8 @@ const api = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify(productData),
         });
@@ -105,7 +127,10 @@ const api = {
     async deleteProduct(id, token) {
         const response = await fetch(`${API_URL}/products/${id}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) {
             const error = await response.json();
@@ -116,7 +141,10 @@ const api = {
 
     async checkProductSales(id, token) {
         const response = await fetch(`${API_URL}/products/${id}/has-sales`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to check sales history');
         return response.json();
@@ -124,7 +152,10 @@ const api = {
 
     async getUsers(token) {
         const response = await fetch(`${API_URL}/users`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch users');
         return response.json();
@@ -135,7 +166,8 @@ const api = {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify({ new_password: newPassword }),
         });
@@ -148,15 +180,21 @@ const api = {
 
     async getReceipt(token, receiptNumber) {
         const response = await fetch(`${API_URL}/receipts/${receiptNumber}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch receipt');
         return response.json();
     },
 
     async lookupCustomer(phone, token) {
-        const response = await fetch(`${API_URL}/customers/lookup?phone=${encodeURIComponent(phone)}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(`${API_URL}/customers?phone=${encodeURIComponent(phone)}`, {
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
@@ -167,7 +205,10 @@ const api = {
 
     async getAllCustomers(token, minPurchases = 0) {
         const response = await fetch(`${API_URL}/customers?minPurchases=${minPurchases}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch customers');
         return response.json();
@@ -178,7 +219,8 @@ const api = {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify(discountData),
         });
@@ -188,7 +230,10 @@ const api = {
 
     async getCustomerPurchases(id, token) {
         const response = await fetch(`${API_URL}/customers/${id}/purchases`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch purchase history');
         return response.json();
@@ -196,7 +241,10 @@ const api = {
 
     async exportInventory(token) {
         const response = await fetch(`${API_URL}/excel/export`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Export failed');
         return response.blob();
@@ -204,7 +252,10 @@ const api = {
 
     async getSettings(token) {
         const response = await fetch(`${API_URL}/settings`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch settings');
         return response.json();
@@ -215,7 +266,8 @@ const api = {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify({ value }),
         });
@@ -224,8 +276,11 @@ const api = {
     },
 
     async getProductPerformance(token, period = 'today') {
-        const response = await fetch(`${API_URL}/dashboard/product-performance?period=${period}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(`${API_URL}/dashboard?action=product-performance&period=${period}`, {
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch performance data');
         return response.json();
@@ -238,7 +293,10 @@ const api = {
         if (filters.type && filters.type !== 'all') params.append('type', filters.type);
 
         const response = await fetch(`${API_URL}/audit?${params.toString()}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Failed to fetch audit logs');
         return response.json();
@@ -246,7 +304,10 @@ const api = {
 
     async backupDatabase(token) {
         const response = await fetch(`${API_URL}/admin/backup`, {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
         });
         if (!response.ok) throw new Error('Backup failed');
         return response.blob();
