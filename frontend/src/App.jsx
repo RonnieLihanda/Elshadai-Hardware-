@@ -944,8 +944,36 @@ function Inventory() {
   const fetchProducts = () => {
     api.getAllProducts(token).then(setProducts);
   };
-  // ... (helper functions)
-  const handleExport = async () => { /* ... */ };
+
+  const handleDelete = async (productId) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+
+    try {
+      await api.deleteProduct(productId, token);
+      fetchProducts();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await api.exportInventory(token);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventory-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="card">
