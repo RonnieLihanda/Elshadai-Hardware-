@@ -233,6 +233,25 @@ function Navbar({ user, setView, onLogout, activeView }) {
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button
+          onClick={() => setView('pos')}
+          style={{
+            background: activeView === 'pos' ? 'var(--primary)' : '#f0fdf4',
+            color: activeView === 'pos' ? 'white' : 'var(--primary)',
+            padding: '0.5rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            borderRadius: '8px',
+            border: '2px solid var(--primary)',
+            fontWeight: '600',
+            fontSize: '0.9rem'
+          }}
+          title="Go to Point of Sale"
+        >
+          <ShoppingCart size={20} />
+          {activeView === 'pos' ? 'POS Active' : 'Go to POS'}
+        </button>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{user.fullName}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role}</div>

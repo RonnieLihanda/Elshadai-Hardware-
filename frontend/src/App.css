@@ -127,9 +127,15 @@ input:focus {
 }
 
 .cart-section {
+  position: sticky;
+  top: 1rem;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  max-height: calc(100vh - 140px);
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 1rem;
 }
 
 .cart-items {
@@ -137,6 +143,7 @@ input:focus {
   overflow-y: auto;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
+  min-height: 0; /* Important for flex overflow */
 }
 
 .cart-item {
