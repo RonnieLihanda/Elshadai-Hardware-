@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import './App.css';
 import api from './api';
-import { ShoppingCart, LayoutDashboard, Package, LogOut, Search, Plus, Minus, X, Printer, CheckCircle, Users, Edit, Trash2, TrendingUp, TrendingDown, DollarSign, AlertTriangle, RefreshCw, Mail, Bell, History, Download } from 'lucide-react';
+import { ShoppingCart, LayoutDashboard, Package, LogOut, Search, Plus, Minus, X, Printer, CheckCircle, Users, Edit, Trash2, TrendingUp, TrendingDown, DollarSign, AlertTriangle, RefreshCw, Mail, Bell, History, Download, Eye, EyeOff } from 'lucide-react';
 
 // Simplified Auth Context
 const AuthContext = createContext(null);
@@ -67,6 +67,8 @@ function App() {
 function Login({ onLogin, error, loading }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   return (
     <div className="modal-overlay" style={{ background: 'var(--primary)' }}>
@@ -77,19 +79,126 @@ function Login({ onLogin, error, loading }) {
             <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Username</label>
             <input type="text" value={username} onChange={e => setUsername(e.target.value)} required />
           </div>
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
             <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                style={{ width: '100%', paddingRight: '2.5rem' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: 'var(--text-muted)'
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
           {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>{error}</p>}
-          <button className="bg-primary" style={{ width: '100%', padding: '0.75rem' }} disabled={loading}>
+          <button className="bg-primary" style={{ width: '100%', padding: '0.75rem', marginBottom: '0.75rem' }} disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowForgotPassword(true)}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--primary)',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            Forgot Password?
           </button>
         </form>
         <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
           Elshadai Hardware • Musembe, Eldoret
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="modal-overlay" onClick={() => setShowForgotPassword(false)}>
+          <div className="modal" style={{ maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--primary)' }}>Password Reset</h3>
+              <button onClick={() => setShowForgotPassword(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{
+              padding: '1.5rem',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+                <Mail size={20} style={{ color: 'var(--primary)', marginTop: '2px' }} />
+                <div>
+                  <p style={{ margin: '0 0 0.5rem 0', fontWeight: '600', fontSize: '0.95rem' }}>
+                    Contact Administrator
+                  </p>
+                  <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    To reset your password, please email the administrator:
+                  </p>
+                  <a
+                    href="mailto:ronnielihanda@gmail.com?subject=Password Reset Request - Elshadai POS&body=Hello,%0D%0A%0D%0AI need to reset my password for the Elshadai POS system.%0D%0A%0D%0AUsername: [Your username]%0D%0A%0D%0AThank you."
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: 'var(--primary)',
+                      color: 'white',
+                      borderRadius: '6px',
+                      textDecoration: 'none',
+                      fontSize: '0.9rem',
+                      fontWeight: '500'
+                    }}
+                  >
+                    <Mail size={16} />
+                    ronnielihanda@gmail.com
+                  </a>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowForgotPassword(false)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#f1f5f9',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
