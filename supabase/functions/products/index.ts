@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
     const isNumericId = !isNaN(Number(productId));
 
     // Route based on method and path
-    if (method === 'GET' && path.includes('/search')) {
+    if (method === 'GET' && url.searchParams.has('q')) {
       return await handleSearch(url, user);
     } else if (method === 'GET' && path.includes('/has-sales') && isNumericId) {
       return await handleCheckSales(user, productId);
