@@ -11,13 +11,18 @@ This guide will help you deploy the Elshadai POS frontend to Cloudflare Pages (r
 
 ### 1. Create Cloudflare Pages Project
 
+⚠️ **IMPORTANT**: Use **Pages**, NOT **Workers**
+
 1. Go to https://dash.cloudflare.com
-2. Click **Pages** in the left sidebar
-3. Click **Create a project**
-4. Click **Connect to Git**
-5. Authorize Cloudflare to access your GitHub account
-6. Select your repository: **Elshadai-Hardware-**
-7. Click **Begin setup**
+2. In the left sidebar, click **Workers & Pages**
+3. **Click the "Pages" tab** at the top (not the default "Workers" view)
+4. Click **Create a project** (or **Create application** → **Pages**)
+5. Click **Connect to Git**
+6. Authorize Cloudflare to access your GitHub account
+7. Select your repository: **Elshadai-Hardware-**
+8. Click **Begin setup**
+
+**Direct link to Pages**: https://dash.cloudflare.com/pages
 
 ### 2. Configure Build Settings
 
