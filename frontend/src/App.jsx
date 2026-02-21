@@ -826,6 +826,7 @@ function Inventory() {
   const [isAdding, setIsAdding] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -868,21 +869,39 @@ function Inventory() {
       {showTracking ? (
         <InventoryAuditTrail />
       ) : (
-        <div className="table-container">
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', background: '#f8fafc', borderBottom: '2px solid var(--border)' }}>
-                <th style={{ padding: '0.75rem' }}>Code</th>
-                <th style={{ padding: '0.75rem' }}>Description</th>
-                <th style={{ padding: '0.75rem' }}>Stock</th>
-                <th style={{ padding: '0.75rem' }}>Buying</th>
-                <th style={{ padding: '0.75rem' }}>Regular</th>
-                <th style={{ padding: '0.75rem' }}>Discount</th>
-                <th style={{ padding: '0.75rem' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(p => (
+        <>
+          <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={20} />
+            <input
+              type="text"
+              placeholder="Search by product code or description..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ paddingLeft: '2.5rem', width: '100%' }}
+            />
+          </div>
+
+          <div className="table-container">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', background: '#f8fafc', borderBottom: '2px solid var(--border)' }}>
+                  <th style={{ padding: '0.75rem' }}>Code</th>
+                  <th style={{ padding: '0.75rem' }}>Description</th>
+                  <th style={{ padding: '0.75rem' }}>Stock</th>
+                  <th style={{ padding: '0.75rem' }}>Buying</th>
+                  <th style={{ padding: '0.75rem' }}>Regular</th>
+                  <th style={{ padding: '0.75rem' }}>Discount</th>
+                  <th style={{ padding: '0.75rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(search.length > 0
+                  ? products.filter(p =>
+                      p.item_code.toLowerCase().includes(search.toLowerCase()) ||
+                      p.description.toLowerCase().includes(search.toLowerCase())
+                    )
+                  : products
+                ).map(p => (
                 <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '0.75rem' }}>{p.item_code}</td>
                   <td style={{ padding: '0.75rem', fontWeight: '500' }}>{p.description}</td>
@@ -903,6 +922,7 @@ function Inventory() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {(editingProduct || isAdding) && (

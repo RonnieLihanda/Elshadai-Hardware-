@@ -69,7 +69,7 @@ const api = {
     },
 
     async getDashboardStats(token, period = 'today') {
-        const response = await fetch(`${API_URL}/dashboard?action=stats&period=${period}`, {
+        const response = await fetch(`${API_URL}/dashboard?period=${period}`, {
             headers: {
                 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
                 'apikey': SUPABASE_ANON_KEY
@@ -178,6 +178,17 @@ const api = {
         return response.json();
     },
 
+    async getAllReceipts(token) {
+        const response = await fetch(`${API_URL}/receipts`, {
+            headers: {
+                'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY
+            },
+        });
+        if (!response.ok) throw new Error('Failed to fetch receipts');
+        return response.json();
+    },
+
     async getReceipt(token, receiptNumber) {
         const response = await fetch(`${API_URL}/receipts/${receiptNumber}`, {
             headers: {
@@ -276,7 +287,7 @@ const api = {
     },
 
     async getProductPerformance(token, period = 'today') {
-        const response = await fetch(`${API_URL}/dashboard?action=product-performance&period=${period}`, {
+        const response = await fetch(`${API_URL}/dashboard/products?period=${period}`, {
             headers: {
                 'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
                 'apikey': SUPABASE_ANON_KEY
