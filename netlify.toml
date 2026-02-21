@@ -1,0 +1,16 @@
+# Netlify configuration for Elshadai POS Frontend
+
+[build]
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+# SPA redirect rules - all routes go to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Environment variables (you can also set these in Netlify UI)
+# VITE_API_URL = "https://vphdxmxcwbpkvppytrjn.supabase.co/functions/v1"
+# VITE_SUPABASE_ANON_KEY = "your-anon-key-here"
