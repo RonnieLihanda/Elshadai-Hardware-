@@ -124,13 +124,12 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
 
-    if (path.includes('/stats')) {
-      return await handleStats(url, user);
-    } else if (path.includes('/product-performance')) {
+    if (path.includes('/products')) {
       return await handleProductPerformance(url, user);
+    } else {
+      // Default to stats for /dashboard?period=X
+      return await handleStats(url, user);
     }
-
-    return errorResponse('Endpoint not found', 404);
   } catch (err) {
     console.error('Dashboard error:', err);
     return errorResponse(err.message);
