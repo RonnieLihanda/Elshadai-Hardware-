@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import './App.css';
 import api from './api';
-import { ShoppingCart, LayoutDashboard, Package, LogOut, Search, Plus, Minus, X, Printer, CheckCircle, Users, Edit, Trash2, TrendingUp, TrendingDown, DollarSign, AlertTriangle, RefreshCw, Mail, Bell, History, Download, Eye, EyeOff } from 'lucide-react';
+import { ShoppingCart, LayoutDashboard, Package, LogOut, Search, Plus, Minus, X, Printer, CheckCircle, Users, Edit, Trash2, TrendingUp, TrendingDown, DollarSign, AlertTriangle, AlertCircle, RefreshCw, Mail, Bell, History, Download, Eye, EyeOff } from 'lucide-react';
 
 // Simplified Auth Context
 const AuthContext = createContext(null);
@@ -291,11 +291,17 @@ function POS() {
   }, [search, token]);
 
   const addToCart = (product) => {
-    if (product.quantity <= 0) return;
+    if (product.quantity <= 0) {
+      alert('⚠️ Out of stock!\n\nThis product is currently unavailable.');
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.quantity) return prev;
+        if (existing.quantity >= product.quantity) {
+          alert(`⚠️ Cannot add more!\n\nOnly ${product.quantity} units available in stock.`);
+          return prev;
+        }
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
       return [...prev, { ...product, quantity: 1 }];
@@ -310,6 +316,11 @@ function POS() {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
+        // Alert if trying to exceed stock
+        if (newQty > max && delta > 0) {
+          alert(`⚠️ Stock limit reached!\n\nOnly ${max} units available.`);
+          return item;
+        }
         // Allow up to max stock, and at least 0
         if (newQty >= 0 && newQty <= max) return { ...item, quantity: newQty };
       }
@@ -319,6 +330,9 @@ function POS() {
 
   const manualCartQty = (id, val, max) => {
     const newQty = parseInt(val) || 0;
+    if (newQty > max) {
+      alert(`⚠️ Stock limit exceeded!\n\nOnly ${max} units available. Setting to maximum.`);
+    }
     setCart(prev => prev.map(item => {
       if (item.id === id) {
         let qty = newQty;
@@ -636,7 +650,13 @@ function POS() {
             className="bg-primary"
             style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
             disabled={cart.length === 0 || completing}
-            onClick={() => setShowPreview(true)}
+            onClick={() => {
+              if (cart.length === 0) {
+                alert('🛒 Cart is empty!\n\nAdd products to cart before checking out.');
+                return;
+              }
+              setShowPreview(true);
+            }}
           >
             {completing ? 'Processing...' : 'Review & Checkout'}
           </button>
@@ -844,6 +864,7 @@ function UserManagement() {
   const [users, setUsers] = useState([]);
   const [modalUser, setModalUser] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [msg, setMsg] = useState({ type: '', text: '' });
 
   const fetchUsers = () => {
@@ -860,12 +881,17 @@ function UserManagement() {
       setMsg({ type: 'error', text: 'Password must be at least 6 characters' });
       return;
     }
+    if (newPassword !== confirmPassword) {
+      setMsg({ type: 'error', text: 'Passwords do not match!' });
+      return;
+    }
     try {
       await api.updateUserPassword(token, modalUser.id, newPassword);
       setMsg({ type: 'success', text: 'Password updated successfully' });
       setTimeout(() => {
         setModalUser(null);
         setNewPassword('');
+        setConfirmPassword('');
         setMsg({ type: '', text: '' });
       }, 2000);
     } catch (err) {
@@ -929,6 +955,18 @@ function UserManagement() {
                   required
                 />
               </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                />
+                {confirmPassword && newPassword !== confirmPassword && (
+                  <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.25rem' }}>Passwords do not match</p>
+                )}
+              </div>
               {msg.text && (
                 <div style={{ color: msg.type === 'error' ? 'var(--danger)' : 'var(--success)', fontSize: '0.85rem', marginBottom: '1rem' }}>
                   {msg.text}
@@ -955,6 +993,7 @@ function Inventory() {
   const [exporting, setExporting] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const [search, setSearch] = useState('');
+  const [productToDelete, setProductToDelete] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -964,11 +1003,10 @@ function Inventory() {
     api.getAllProducts(token).then(setProducts);
   };
 
-  const handleDelete = async (productId) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-
+  const confirmDelete = async () => {
     try {
-      await api.deleteProduct(productId, token);
+      await api.deleteProduct(productToDelete.id, token);
+      setProductToDelete(null);
       fetchProducts();
     } catch (err) {
       alert(err.message);
@@ -1071,7 +1109,7 @@ function Inventory() {
                   <td style={{ padding: '0.75rem' }}>{p.discount_price.toLocaleString()}</td>
                   <td style={{ padding: '0.75rem' }}>
                     <button className="btn-edit" onClick={() => setEditingProduct(p)}><Edit size={14} /></button>
-                    <button className="btn-delete" onClick={() => handleDelete(p.id)}><Trash2 size={14} /></button>
+                    <button className="btn-delete" onClick={() => setProductToDelete(p)}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}
@@ -1089,6 +1127,29 @@ function Inventory() {
           token={token}
         />
       )}
+
+      {productToDelete && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '450px' }}>
+            <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertCircle size={24} /> Delete Product?
+            </h3>
+            <div style={{ margin: '1.5rem 0', padding: '1rem', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+              <p style={{ margin: '0 0 0.5rem', fontWeight: '600' }}>{productToDelete.item_code} - {productToDelete.description}</p>
+              <p style={{ margin: '0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Current stock: {productToDelete.quantity} units</p>
+            </div>
+            <p style={{ color: 'var(--danger)', fontWeight: '600', fontSize: '0.9rem' }}>⚠️ This action cannot be undone!</p>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button onClick={() => setProductToDelete(null)} style={{ flex: 1, border: '1px solid var(--border)', background: 'white' }}>
+                Cancel
+              </button>
+              <button onClick={confirmDelete} style={{ flex: 1, background: 'var(--danger)', color: 'white' }}>
+                Yes, Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1102,7 +1163,8 @@ function ProductModal({ product, onClose, onSave, token }) {
     buying_price: 0,
     regular_price: 0,
     discount_price: 0,
-    low_stock_threshold: 5
+    low_stock_threshold: 5,
+    discount_threshold: 7
   });
 
   const isEdit = !!product;
@@ -1215,6 +1277,20 @@ function ProductModal({ product, onClose, onSave, token }) {
                 required
               />
             </div>
+          </div>
+
+          <div style={{ marginTop: '0.5rem' }}>
+            <label style={{ fontSize: '0.85rem' }}>Bulk Discount Threshold (Minimum Quantity)</label>
+            <input
+              type="number"
+              min="2"
+              value={formData.discount_threshold || 7}
+              onChange={e => setFormData({ ...formData, discount_threshold: parseInt(e.target.value) || 7 })}
+              required
+            />
+            <small style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+              Customers buying {formData.discount_threshold || 7}+ units get KES {formData.discount_price} each (instead of KES {formData.regular_price})
+            </small>
           </div>
 
           <div className="calculated-profit">

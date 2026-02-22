@@ -301,3 +301,154 @@ input:focus {
     transform: rotate(360deg);
   }
 }
+
+/* ========================================
+   MOBILE RESPONSIVE DESIGN
+   ======================================== */
+
+/* Mobile phones (< 768px) */
+@media (max-width: 768px) {
+  /* Make inputs touch-friendly */
+  input, button, select {
+    min-height: 44px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* Stack POS grid vertically */
+  .pos-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 1rem;
+  }
+
+  /* Make cart section compact on mobile */
+  .cart-section {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+
+  /* Single column product grid */
+  .products-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stack dashboard cards */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Responsive tables */
+  .table-container {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 600px;
+    font-size: 0.85rem;
+  }
+
+  th, td {
+    padding: 0.5rem !important;
+  }
+
+  /* Compact header */
+  .navbar {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Smaller modals on mobile */
+  .modal {
+    width: 95%;
+    padding: 1.5rem;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Adjust main content padding */
+  .main-content {
+    padding: 1rem;
+  }
+
+  /* Compact cards */
+  .card {
+    padding: 1rem;
+  }
+
+  /* Receipt styling */
+  .receipt-container {
+    font-size: 0.85rem;
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* Tablets (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Two-column product grid */
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Two-column dashboard */
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Adjust POS cart width */
+  .pos-grid {
+    grid-template-columns: 1fr 320px;
+  }
+}
+
+/* Small mobile phones (< 480px) */
+@media (max-width: 480px) {
+  /* Even more compact spacing */
+  body {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+  }
+
+  /* Compact button spacing */
+  .btn, button {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  /* Stack form grids */
+  .modal form > div[style*="grid"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Landscape mobile */
+@media (max-height: 600px) and (orientation: landscape) {
+  /* Reduce heights for landscape */
+  .pos-grid {
+    height: auto;
+  }
+
+  .cart-section {
+    max-height: 400px;
+  }
+}
