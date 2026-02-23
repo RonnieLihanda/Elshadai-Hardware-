@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import './App.css';
 import api from './api';
-import { ShoppingCart, LayoutDashboard, Package, LogOut, Search, Plus, Minus, X, Printer, CheckCircle, Users, Edit, Trash2, TrendingUp, TrendingDown, DollarSign, AlertTriangle, AlertCircle, RefreshCw, Mail, Bell, History, Download, Eye, EyeOff } from 'lucide-react';
+import { ShoppingCart, LayoutDashboard, Package, LogOut, Search, Plus, Minus, X, Printer, CheckCircle, Users, Edit, Trash2, TrendingUp, TrendingDown, DollarSign, AlertTriangle, AlertCircle, RefreshCw, Mail, Bell, History, Download, Eye, EyeOff, Menu } from 'lucide-react';
 
 // Simplified Auth Context
 const AuthContext = createContext(null);
@@ -203,64 +203,186 @@ function Login({ onLogin, error, loading }) {
   );
 }
 
-// Navbar Component
+// Navbar Component with Mobile Menu
 function Navbar({ user, setView, onLogout, activeView }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const menuItems = [
+    { id: 'pos', icon: ShoppingCart, label: 'POS', show: true },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', show: user.role === 'admin' },
+    { id: 'inventory', icon: Package, label: 'Inventory', show: user.role === 'admin' },
+    { id: 'customers', icon: Users, label: 'Customers', show: user.role === 'admin' },
+    { id: 'sales', icon: History, label: 'History', show: user.role === 'admin' },
+    { id: 'users', icon: CheckCircle, label: 'Users', show: user.role === 'admin' }
+  ];
+
+  const handleMenuClick = (view) => {
+    setView(view);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <nav style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0.75rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--primary)' }}>Elshadai Hardware</div>
-      <div style={{ display: 'flex', gap: '1.5rem' }}>
-        <button onClick={() => setView('pos')} style={{ background: 'transparent', color: activeView === 'pos' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ShoppingCart size={20} /> POS
-        </button>
-        {user.role === 'admin' && (
-          <>
-            <button onClick={() => setView('dashboard')} style={{ background: 'transparent', color: activeView === 'dashboard' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <LayoutDashboard size={20} /> Dashboard
-            </button>
-            <button onClick={() => setView('inventory')} style={{ background: 'transparent', color: activeView === 'inventory' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Package size={20} /> Inventory
-            </button>
-            <button onClick={() => setView('customers')} style={{ background: 'transparent', color: activeView === 'customers' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users size={20} /> Customers
-            </button>
-            <button onClick={() => setView('sales')} style={{ background: 'transparent', color: activeView === 'sales' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <History size={20} /> History
-            </button>
-            <button onClick={() => setView('users')} style={{ background: 'transparent', color: activeView === 'users' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle size={20} /> Users
-            </button>
-          </>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+    <>
+      <nav style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0.75rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 100 }}>
+        {/* Mobile Hamburger */}
         <button
-          onClick={() => setView('pos')}
+          className="mobile-menu-toggle"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{
-            background: activeView === 'pos' ? 'var(--primary)' : '#f0fdf4',
-            color: activeView === 'pos' ? 'white' : 'var(--primary)',
-            padding: '0.5rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            borderRadius: '8px',
-            border: '2px solid var(--primary)',
-            fontWeight: '600',
-            fontSize: '0.9rem'
+            display: 'none',
+            background: 'transparent',
+            padding: '0.5rem',
+            color: 'var(--primary)'
           }}
-          title="Go to Point of Sale"
         >
-          <ShoppingCart size={20} />
-          {activeView === 'pos' ? 'POS Active' : 'Go to POS'}
+          <Menu size={24} />
         </button>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{user.fullName}</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role}</div>
+
+        {/* Logo */}
+        <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--primary)' }}>
+          Elshadai Hardware
         </div>
-        <button onClick={onLogout} style={{ background: '#fee2e2', color: 'var(--danger)', padding: '0.5rem' }}>
-          <LogOut size={18} />
-        </button>
-      </div>
-    </nav>
+
+        {/* Desktop Navigation */}
+        <div className="desktop-nav" style={{ display: 'flex', gap: '1.5rem' }}>
+          {menuItems.filter(item => item.show).map(item => (
+            <button
+              key={item.id}
+              onClick={() => setView(item.id)}
+              style={{
+                background: 'transparent',
+                color: activeView === item.id ? 'var(--primary)' : 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontWeight: activeView === item.id ? '600' : '400'
+              }}
+            >
+              <item.icon size={20} /> {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Right Side Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="user-info-desktop" style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{user.fullName}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role}</div>
+          </div>
+          <button onClick={onLogout} style={{ background: '#fee2e2', color: 'var(--danger)', padding: '0.5rem', borderRadius: '6px' }}>
+            <LogOut size={18} />
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Slide-Out Menu */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="mobile-menu-overlay"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 998
+            }}
+          />
+          <div
+            className="mobile-menu"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: '280px',
+              background: 'white',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+              zIndex: 999,
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'slideIn 0.3s ease-out'
+            }}
+          >
+            {/* Menu Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--primary)' }}>Elshadai Hardware</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{user.fullName}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role}</div>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ background: 'transparent', color: 'var(--text-muted)', padding: '0.25rem' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Menu Items */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0' }}>
+              {menuItems.filter(item => item.show).map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => handleMenuClick(item.id)}
+                  style={{
+                    width: '100%',
+                    padding: '1rem 1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    background: activeView === item.id ? '#f0fdf4' : 'transparent',
+                    color: activeView === item.id ? 'var(--primary)' : 'var(--text-main)',
+                    borderLeft: activeView === item.id ? '4px solid var(--primary)' : '4px solid transparent',
+                    textAlign: 'left',
+                    fontSize: '1rem',
+                    fontWeight: activeView === item.id ? '600' : '400',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <item.icon size={22} />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Logout Button */}
+            <div style={{ padding: '1rem', borderTop: '1px solid var(--border)' }}>
+              <button
+                onClick={() => {
+                  onLogout();
+                  setMobileMenuOpen(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#fee2e2',
+                  color: 'var(--danger)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  borderRadius: '6px',
+                  fontWeight: '600'
+                }}
+              >
+                <LogOut size={20} />
+                Logout
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

@@ -306,8 +306,33 @@ input:focus {
    MOBILE RESPONSIVE DESIGN
    ======================================== */
 
+/* Mobile Menu Animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Mobile phones (< 768px) */
 @media (max-width: 768px) {
+  /* Show mobile menu toggle */
+  .mobile-menu-toggle {
+    display: block !important;
+  }
+
+  /* Hide desktop navigation */
+  .desktop-nav {
+    display: none !important;
+  }
+
+  /* Hide desktop user info */
+  .user-info-desktop {
+    display: none !important;
+  }
+
   /* Make inputs touch-friendly */
   input, button, select {
     min-height: 44px;
