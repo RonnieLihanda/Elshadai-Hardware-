@@ -180,9 +180,7 @@ async function handleCreateSale(req: Request, user: UserPayload) {
         );
       }
 
-      await client.queryObject('COMMIT');
-
-      // Post-sale: Store receipt
+      // Prepare receipt data
       const receiptData = {
         receipt_number,
         seller_name: user.fullName,
@@ -197,10 +195,14 @@ async function handleCreateSale(req: Request, user: UserPayload) {
         created_at: new Date().toISOString(),
       };
 
+      // Insert receipt INSIDE transaction
       await client.queryObject(
         `INSERT INTO receipts (receipt_number, sale_id, receipt_data) VALUES ($1, $2, $3)`,
         [receipt_number, sale_id, JSON.stringify(receiptData)]
       );
+
+      // Commit transaction - everything succeeds or fails together
+      await client.queryObject('COMMIT');
 
       return successResponse({
         id: sale_id,
