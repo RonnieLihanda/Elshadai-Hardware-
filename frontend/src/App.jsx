@@ -537,10 +537,7 @@ function POS() {
           quantity: item.quantity,
           unit_price: effectivePrice,
           total_price: effectivePrice * item.quantity,
-          profit: (effectivePrice - item.buying_price) * item.quantity,
-          discount_applied: item.quantity >= (item.discount_threshold || 7),
-          regular_price: item.regular_price,
-          discount_price: item.discount_price
+          profit: (effectivePrice - item.buying_price) * item.quantity
         };
       });
 
