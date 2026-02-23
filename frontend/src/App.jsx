@@ -835,16 +835,13 @@ function Receipt({ receipt, onClose }) {
               </tr>
             </thead>
             <tbody>
-              {receipt.items.map((item, idx) => {
-                const isDiscounted = item.discount_applied;
-                return (
-                  <tr key={idx}>
-                    <td style={{ textAlign: 'left' }}>{item.description.substring(0, 18)}</td>
-                    <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                    <td style={{ textAlign: 'right' }}>{item.total_price.toLocaleString()}{isDiscounted ? '*' : ''}</td>
-                  </tr>
-                );
-              })}
+              {receipt.items.map((item, idx) => (
+                <tr key={idx}>
+                  <td style={{ textAlign: 'left' }}>{item.description.substring(0, 18)}</td>
+                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'right' }}>{item.total_price.toLocaleString()}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 
