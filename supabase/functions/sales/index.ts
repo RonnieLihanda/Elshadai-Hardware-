@@ -13,7 +13,6 @@ interface SaleItem {
   profit: number;
   item_code?: string;
   buying_price?: number;
-  discount_applied?: boolean;
 }
 
 async function logInventoryChange(
@@ -79,8 +78,7 @@ async function handleCreateSale(req: Request, user: UserPayload) {
         product_id: product.id,
         item_code: product.item_code,
         description: product.description,
-        buying_price: product.buying_price,
-        discount_applied: item.quantity >= (product.discount_threshold || 7),
+        buying_price: product.buying_price
       });
     }
 
@@ -134,9 +132,9 @@ async function handleCreateSale(req: Request, user: UserPayload) {
       // Insert Items and Update Stock
       for (const item of processedItems) {
         await client.queryObject(
-          `INSERT INTO sale_items (sale_id, product_id, item_code, description, quantity, unit_price, total_price, profit, discount_applied)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [sale_id, item.product_id, item.item_code, item.description, item.quantity, item.unit_price, item.total_price, item.profit, item.discount_applied ? 1 : 0]
+          `INSERT INTO sale_items (sale_id, product_id, item_code, description, quantity, unit_price, total_price, profit)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [sale_id, item.product_id, item.item_code, item.description, item.quantity, item.unit_price, item.total_price, item.profit]
         );
 
         const updateRes = await client.queryObject<{ quantity: number }>(
