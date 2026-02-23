@@ -122,20 +122,26 @@ async function handleCreateSale(req: Request, user: UserPayload) {
 
     try {
       // Insert Sale
+      console.log('Inserting sale with data:', { receipt_number, seller_id, customerId, payment_method, finalTotal, finalProfit, items_count: items.length, manual_discount });
+
       const saleRes = await client.queryObject<{ id: number }>(
         `INSERT INTO sales (receipt_number, seller_id, customer_id, payment_method, mpesa_reference, total_amount, total_profit, items_count, manual_discount)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
         [receipt_number, seller_id, customerId, payment_method, mpesa_reference, finalTotal, finalProfit, items.length, manual_discount]
       );
       const sale_id = saleRes.rows[0].id;
+      console.log('Sale created with ID:', sale_id);
 
       // Insert Items and Update Stock
       for (const item of processedItems) {
+        console.log('Inserting sale item:', { sale_id, product_id: item.product_id, item_code: item.item_code, quantity: item.quantity });
+
         await client.queryObject(
           `INSERT INTO sale_items (sale_id, product_id, item_code, description, quantity, unit_price, total_price, profit)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [sale_id, item.product_id, item.item_code, item.description, item.quantity, item.unit_price, item.total_price, item.profit]
         );
+        console.log('Sale item inserted successfully');
 
         const updateRes = await client.queryObject<{ quantity: number }>(
           `UPDATE products SET quantity = quantity - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING quantity`,
@@ -143,19 +149,19 @@ async function handleCreateSale(req: Request, user: UserPayload) {
         );
         const newQuantity = updateRes.rows[0].quantity;
 
-        // Audit log
-        await logInventoryChange(
-          client,
-          item.product_id!,
-          item.item_code!,
-          item.description,
-          'SALE',
-          -item.quantity,
-          newQuantity + item.quantity,
-          newQuantity,
-          seller_id,
-          `Sale ${receipt_number}`
-        );
+        // Audit log - TEMPORARILY DISABLED until inventory_audit table is fixed
+        // await logInventoryChange(
+        //   client,
+        //   item.product_id!,
+        //   item.item_code!,
+        //   item.description,
+        //   'SALE',
+        //   -item.quantity,
+        //   newQuantity + item.quantity,
+        //   newQuantity,
+        //   seller_id,
+        //   `Sale ${receipt_number}`
+        // );
       }
 
       if (discountAmount > 0 && customerId) {
@@ -211,12 +217,18 @@ async function handleCreateSale(req: Request, user: UserPayload) {
         ...receiptData,
       });
     } catch (err) {
+      console.error('Transaction error - rolling back:', err);
       await client.queryObject('ROLLBACK');
       throw err;
     }
   } catch (error) {
     console.error('Sale failed:', error);
-    return errorResponse(error.message);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return errorResponse(`Sale failed: ${error.message}`);
   } finally {
     await client.end();
   }
